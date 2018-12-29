@@ -1,0 +1,52 @@
+---
+- name: Vérification de la présence du fichier resolv.conf
+  stat: 
+    path: /etc/resolv.conf
+  register: dns_result_resolv
+
+- name: Vérification de la présence du fichier resolv.conf.bak
+  stat: 
+    path: /etc/resolv.conf.bak
+  register: dns_result_resolv_bak
+
+- name: Sauvegarde du vieux fichier resolv.conf
+  copy: 
+    remote_src: true 
+    src: /etc/resolv.conf 
+    dest: /etc/resolv.conf.bak
+  when: 
+    - dns_result_resolv.stat.exists
+    - dns_result_resolv_bak.stat.exists == False
+
+- name: Supprime le fichier original
+  file:
+    path: /etc/resolv.conf
+    state: absent
+  when: dns_result_resolv.stat.exists
+
+- name: Création du fichier resolv.conf
+  file:
+    path: /etc/resolv.conf
+    state: touch
+
+- name: Ajout de l'entrée search
+  lineinfile:
+    dest: /etc/resolv.conf
+    line: "{{ dns_search }}"
+
+- name: Ajout de l'entrée nameserver
+  lineinfile:
+    path: /etc/resolv.conf
+    insertafter: '^{{ dns_search }}'
+    line: '{{ item }}'
+  with_items: '{{ dns_nameserver }}'
+
+- name: Ajout du fichier de non update pour debian
+  copy:
+    src: nodnsupdate
+    dest: /etc/dhcp/dhclient-enter-hooks.d/nodnsupdate
+    owner: root
+    group: root
+    mode: 0755
+
+...
